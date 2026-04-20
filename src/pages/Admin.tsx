@@ -8,7 +8,7 @@ import {
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
-import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft } from 'lucide-react';
+import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X } from 'lucide-react';
 
 interface UploadItem {
   id: string;
@@ -19,6 +19,7 @@ interface UploadItem {
 export default function Admin() {
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -197,7 +198,10 @@ export default function Admin() {
           <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {uploads.map((item) => (
               <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <a href={item.imageUrl} target="_blank" rel="noreferrer" className="block w-full aspect-square bg-gray-50 overflow-hidden relative group">
+                <button 
+                  onClick={() => setSelectedImage(item.imageUrl)}
+                  className="block w-full aspect-square bg-gray-50 overflow-hidden relative group cursor-pointer border-0 p-0 text-left"
+                >
                   <img 
                     src={item.imageUrl} 
                     alt="Uploaded" 
@@ -205,7 +209,7 @@ export default function Admin() {
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                </a>
+                </button>
                 <div className="p-3 bg-white text-xs text-gray-500 flex justify-between items-center">
                   <span>上傳時間</span>
                   <span>{item.uploadedAt ? item.uploadedAt.toLocaleString() : '未知'}</span>
@@ -215,6 +219,32 @@ export default function Admin() {
           </div>
         )}
       </div>
+
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-5xl w-full max-h-[90vh] flex items-center justify-center">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImage(null);
+              }}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 bg-gray-800 hover:bg-black p-2 rounded-full transition-colors"
+              title="關閉"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={selectedImage} 
+              alt="Enlarged view" 
+              className="max-w-full max-h-[85vh] rounded-lg shadow-xl object-contain bg-black/50"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
