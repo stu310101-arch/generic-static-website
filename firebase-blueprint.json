@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "An admin user profile.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        }
+      },
+      "required": ["email"]
+    },
+    "Upload": {
+      "title": "Upload",
+      "description": "An image uploaded anonymously by a guest or user.",
+      "type": "object",
+      "properties": {
+        "imageUrl": {
+          "type": "string",
+          "description": "The download URL of the image"
+        },
+        "imagePath": {
+          "type": "string",
+          "description": "The path to the image in Firebase Storage"
+        },
+        "uploadedAt": {
+          "type": "timestamp",
+          "description": "When the image was uploaded"
+        }
+      },
+      "required": ["imageUrl", "imagePath", "uploadedAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/Admin"
+      },
+      "description": "Admin privileges indicator."
+    },
+    "/uploads/{uploadId}": {
+      "schema": {
+        "$ref": "#/entities/Upload"
+      },
+      "description": "A collection of images uploaded by anonymous users, viewable only by admins."
+    }
+  }
+}

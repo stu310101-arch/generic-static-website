@@ -1,0 +1,6 @@
+{
+  "name": "匿名圖片上傳系統",
+  "description": "提供訪客匿名上傳圖片，並讓管理者登入後檢視的系統。",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
