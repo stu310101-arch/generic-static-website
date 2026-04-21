@@ -13,6 +13,7 @@ import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X } from 'lucide-
 interface UploadItem {
   id: string;
   imageUrl: string;
+  note?: string | null;
   uploadedAt: Date | null;
 }
 
@@ -58,6 +59,7 @@ export default function Admin() {
         items.push({
           id: doc.id,
           imageUrl: data.imageUrl,
+          note: data.note,
           uploadedAt: data.uploadedAt?.toDate() || null
         });
       });
@@ -210,10 +212,15 @@ export default function Admin() {
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 </button>
-                <div className="p-3 bg-white text-xs text-gray-500 flex justify-between items-center">
+                <div className="p-3 bg-white text-xs text-gray-500 border-b border-gray-100 flex justify-between items-center">
                   <span>上傳時間</span>
                   <span>{item.uploadedAt ? item.uploadedAt.toLocaleString() : '未知'}</span>
                 </div>
+                {item.note && (
+                  <div className="p-3 bg-gray-50 text-sm text-gray-700 min-h-[60px] max-h-[100px] overflow-y-auto w-full break-words">
+                    {item.note}
+                  </div>
+                )}
               </div>
             ))}
           </div>

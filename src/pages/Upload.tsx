@@ -7,6 +7,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [note, setNote] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -82,6 +83,7 @@ export default function Upload() {
       await addDoc(collection(db, 'uploads'), {
         imageUrl: base64String,
         imagePath: 'base64_direct', // 保留此欄位以符合你之前的 Firestore 檢查規則
+        note: note.trim() || null, // 若無文字則存為 null
         uploadedAt: serverTimestamp()
       });
 
@@ -89,6 +91,7 @@ export default function Upload() {
       setIsSuccess(true);
       setFile(null);
       setPreview(null);
+      setNote('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -171,6 +174,19 @@ export default function Upload() {
               className="hidden" 
               ref={fileInputRef}
               onChange={handleFileChange}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              備註文字 (選填)
+            </label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="有什麼想對管理者說的嗎？可以留在這裡..."
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-colors resize-none h-24"
+              disabled={isUploading}
             />
           </div>
 
