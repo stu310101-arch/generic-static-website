@@ -1,8 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { UploadCloud, CheckCircle, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
-import { db, storage } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { UploadCloud, CheckCircle, Loader2, ImagePlus, ArrowLeft, BookOpen } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+
+interface ExamItem {
+  id: string;
+  note?: string | null;
+  uploadedAt: Date | null;
+}
 
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
@@ -11,7 +17,26 @@ export default function Upload() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [exams, setExams] = useState<ExamItem[]>([]);
+  const [selectedExamId, setSelectedExamId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchExams = async () => {
+      try {
+        const q = query(collection(db, 'exams'), orderBy('uploadedAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const items: ExamItem[] = [];
+        querySnapshot.forEach((doc) => {
+          items.push({ id: doc.id, ...doc.data() } as ExamItem);
+        });
+        setExams(items);
+      } catch (err) {
+        console.error('Fetch exams error:', err);
+      }
+    };
+    fetchExams();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -84,6 +109,7 @@ export default function Upload() {
         imageUrl: base64String,
         imagePath: 'base64_direct', // 保留此欄位以符合你之前的 Firestore 檢查規則
         note: note.trim() || null, // 若無文字則存為 null
+        examId: selectedExamId || null,
         uploadedAt: serverTimestamp()
       });
 
@@ -92,6 +118,7 @@ export default function Upload() {
       setFile(null);
       setPreview(null);
       setNote('');
+      setSelectedExamId('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -177,17 +204,39 @@ export default function Upload() {
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              備註文字 (選填)
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="有什麼想對管理者說的嗎？可以留在這裡..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-colors resize-none h-24"
-              disabled={isUploading}
-            />
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+                <BookOpen size={16} className="text-green-500" />
+                這張照片是針對哪一題？ (選填)
+              </label>
+              <select
+                value={selectedExamId}
+                onChange={(e) => setSelectedExamId(e.target.value)}
+                disabled={isUploading || exams.length === 0}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-colors bg-white disabled:bg-gray-50 disabled:text-gray-500 text-gray-900"
+              >
+                <option value="">-- 沒有指定 / 一般上傳 --</option>
+                {exams.map((exam, index) => (
+                  <option key={exam.id} value={exam.id}>
+                    考試題目 {exams.length - index} {exam.note ? ` - ${exam.note.substring(0, 20)}${exam.note.length > 20 ? '...' : ''}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                備註文字 (選填)
+              </label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="有什麼想對管理者說的嗎？可以留在這裡..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-colors resize-none h-24"
+                disabled={isUploading}
+              />
+            </div>
           </div>
 
           <button

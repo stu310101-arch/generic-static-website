@@ -58,7 +58,7 @@ export default function Exams() {
       </div>
 
       <div className="flex items-center gap-3 mb-8">
-        <div className="bg-amber-50 text-amber-600 p-3 rounded-full">
+        <div className="bg-green-50 text-green-600 p-3 rounded-full">
           <BookOpen size={28} />
         </div>
         <div>
@@ -75,7 +75,7 @@ export default function Exams() {
           </div>
         ) : isLoading ? (
           <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-            <Loader2 className="animate-spin mb-4 text-amber-500" size={36} />
+            <Loader2 className="animate-spin mb-4 text-green-500" size={36} />
             <p>載入考試題目中...</p>
           </div>
         ) : exams.length === 0 ? (
@@ -109,7 +109,7 @@ export default function Exams() {
                 </div>
                 {item.note && (
                   <div 
-                    className="p-3 bg-amber-50/50 text-sm text-gray-800 min-h-[60px] max-h-[100px] overflow-y-auto w-full break-words select-none"
+                    className="p-3 bg-green-50/50 text-sm text-gray-800 min-h-[60px] max-h-[100px] overflow-y-auto w-full break-words select-none"
                     onContextMenu={(e) => e.preventDefault()}
                   >
                     {item.note}

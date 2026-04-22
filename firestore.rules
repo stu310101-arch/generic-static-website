@@ -1,51 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default Deny All
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Primitive Helpers
-    function isValidId(id) { 
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
-    }
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-    function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
-
-    // Validation Helpers
-    function isValidAdmin(data) {
-      return data.keys().hasAll(['email']) && data.keys().size() == 1
-        && data.email is string && data.email.size() > 0 && data.email.size() <= 200;
-    }
-
-    function isValidUpload(data) {
-      return data.keys().hasAll(['imageUrl', 'imagePath', 'uploadedAt']) && data.keys().size() == 3
-        && data.imageUrl is string && data.imageUrl.size() <= 1000
-        && data.imagePath is string && data.imagePath.size() <= 500
-        && data.uploadedAt == request.time;
-    }
-
-    // Admins Collection
-    match /admins/{adminId} {
-      allow read: if isAdmin();
-      // Only admins can create/update admins
-      allow create: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming());
-      allow update: if false; // Admins are simple profiles
-      allow delete: if isAdmin();
-    }
-
-    // Uploads Collection
+    // 允許所有人讀取、新增（訪客上傳與看成績榜）
+    // 限制修改與刪除需要登入
     match /uploads/{uploadId} {
-      // Admins can read all uploads
-      allow read: if isAdmin();
-      // Anyone can create an upload anonymously
-      allow create: if isValidId(uploadId) && isValidUpload(incoming());
-      // No updates allowed, except by admin? Let's just lock it or allow admin delete
-      allow update: if false;
-      allow delete: if isAdmin();
+      allow read, create: if true;
+      allow update, delete: if request.auth != null;
+    }
+    
+    // 允許所有人讀取考試題目（讓上傳區可以選題目）
+    // 限制發布、修改、刪除需要登入
+    match /exams/{examId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }

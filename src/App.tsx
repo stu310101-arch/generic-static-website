@@ -3,6 +3,7 @@ import Home from './pages/Home';
 import Upload from './pages/Upload';
 import Admin from './pages/Admin';
 import Exams from './pages/Exams';
+import Scores from './pages/Scores';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/upload" element={<Upload />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/exams" element={<Exams />} />
+            <Route path="/scores" element={<Scores />} />
           </Routes>
         </main>
       </div>

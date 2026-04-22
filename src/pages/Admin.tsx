@@ -8,20 +8,22 @@ import {
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
-import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X, BookOpen, UploadCloud, CheckCircle, Trash2 } from 'lucide-react';
-import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X, BookOpen, UploadCloud, CheckCircle, Trash2, Trophy, Save } from 'lucide-react';
+import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
 interface UploadItem {
   id: string;
   imageUrl: string;
   note?: string | null;
+  examId?: string | null;
+  score?: number | null;
   uploadedAt: Date | null;
 }
 
 export default function Admin() {
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{id: string, upload: string, exam?: string, score?: number | null} | null>(null);
   const [activeTab, setActiveTab] = useState<'uploads' | 'exams'>('uploads');
   const [fetchError, setFetchError] = useState('');
   
@@ -43,6 +45,16 @@ export default function Admin() {
   
   // Custom delete confirm state
   const [itemToDelete, setItemToDelete] = useState<{id: string, collection: string} | null>(null);
+  
+  // Grading state
+  const [scoreInput, setScoreInput] = useState<number | ''>('');
+  const [isSavingScore, setIsSavingScore] = useState(false);
+
+  useEffect(() => {
+    if (selectedImage) {
+      setScoreInput(selectedImage.score !== undefined && selectedImage.score !== null ? selectedImage.score : '');
+    }
+  }, [selectedImage]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -56,6 +68,7 @@ export default function Admin() {
     if (user) {
       if (activeTab === 'uploads') {
         fetchUploads();
+        fetchExamsList(); // 加這行！確保比對時有題目資料
       } else {
         fetchExamsList();
       }
@@ -77,6 +90,8 @@ export default function Admin() {
           id: doc.id,
           imageUrl: data.imageUrl,
           note: data.note,
+          examId: data.examId,
+          score: data.score,
           uploadedAt: data.uploadedAt?.toDate() || null
         });
       });
@@ -109,6 +124,31 @@ export default function Admin() {
       console.error(error);
     } finally {
       setIsLoadingExams(false);
+    }
+  };
+
+  const handleSaveScore = async () => {
+    if (!selectedImage || scoreInput === '') return;
+    const scoreVal = Number(scoreInput);
+    if (scoreVal < 0 || scoreVal > 20) {
+      alert('請輸入 0 ~ 20 之間的分數');
+      return;
+    }
+    
+    setIsSavingScore(true);
+    try {
+      await updateDoc(doc(db, 'uploads', selectedImage.id), {
+        score: scoreVal
+      });
+      // Update local state
+      setUploads(uploads.map(item => item.id === selectedImage.id ? { ...item, score: scoreVal } : item));
+      setSelectedImage({ ...selectedImage, score: scoreVal });
+      alert('分數已儲存！');
+    } catch (error) {
+      console.error(error);
+      alert('儲存失敗，請確認 Firebase Rules 中 uploads 是否設為 allow update: if isAdmin();');
+    } finally {
+      setIsSavingScore(false);
     }
   };
 
@@ -316,7 +356,7 @@ export default function Admin() {
           onClick={() => setActiveTab('exams')}
           className={`flex items-center space-x-2 px-6 py-3 font-medium transition-colors border-b-2 ${
             activeTab === 'exams' 
-              ? 'border-amber-500 text-amber-700 bg-amber-50 rounded-t-xl' 
+              ? 'border-green-500 text-green-700 bg-green-50 rounded-t-xl' 
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-t-xl'
           }`}
         >
@@ -346,10 +386,13 @@ export default function Admin() {
         ) : (
           <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {uploads.map((item) => (
-              <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow relative">
+              <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow relative flex flex-col">
                 <button 
-                  onClick={() => setSelectedImage(item.imageUrl)}
-                  className="block w-full aspect-square bg-gray-50 overflow-hidden relative group cursor-pointer border-0 p-0 text-left"
+                  onClick={() => {
+                    const matchedExam = exams.find(e => e.id === item.examId);
+                    setSelectedImage({ id: item.id, upload: item.imageUrl, exam: matchedExam?.imageUrl, score: item.score });
+                  }}
+                  className="block w-full aspect-square bg-gray-50 overflow-hidden relative group cursor-pointer border-0 p-0 text-left shrink-0"
                 >
                   <img 
                     src={item.imageUrl} 
@@ -357,7 +400,11 @@ export default function Admin() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 text-white font-medium drop-shadow-md transition-opacity">
+                      {item.examId ? '點擊進行比對' : '點擊放大'}
+                    </span>
+                  </div>
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, collection: 'uploads' }); }}
@@ -366,9 +413,23 @@ export default function Admin() {
                 >
                   <Trash2 size={16} />
                 </button>
-                <div className="p-3 bg-white text-xs text-gray-500 border-b border-gray-100 flex justify-between items-center">
-                  <span>上傳時間</span>
-                  <span>{item.uploadedAt ? item.uploadedAt.toLocaleString() : '未知'}</span>
+                
+                {item.examId && (
+                  <div className="bg-green-50 px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BookOpen size={14} className="text-green-600 shrink-0" />
+                      <span className="text-xs text-green-800 font-medium truncate">針對考題回傳</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="p-3 bg-white text-xs border-b border-gray-100 flex justify-between items-center">
+                  <span className="text-gray-500">{item.uploadedAt ? item.uploadedAt.toLocaleString() : '未知'}</span>
+                  {item.score !== undefined && item.score !== null ? (
+                    <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{item.score} 分</span>
+                  ) : (
+                    <span className="text-gray-400">未評分</span>
+                  )}
                 </div>
                 {item.note && (
                   <div className="p-3 bg-gray-50 text-sm text-gray-700 min-h-[60px] max-h-[100px] overflow-y-auto w-full break-words">
@@ -383,7 +444,7 @@ export default function Admin() {
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden p-6 sm:p-10 max-w-2xl mx-auto">
           <div className="mb-6 flex items-center space-x-3">
-            <BookOpen className="text-amber-500" size={28} />
+            <BookOpen className="text-green-500" size={28} />
             <h2 className="text-2xl font-bold text-gray-900">上傳考試題目</h2>
           </div>
           <p className="text-gray-500 mb-8">在此上傳的圖片會顯示在首頁的「考試題目區」，供一般訪客檢視，且具有基本的防下載保護措施。</p>
@@ -398,7 +459,7 @@ export default function Admin() {
 
             <div 
               onClick={() => !examPreview && fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl relative overflow-hidden transition-all duration-200 ${examPreview ? 'border-gray-300' : 'border-gray-300 hover:border-amber-400 cursor-pointer bg-gray-50'}`}
+              className={`border-2 border-dashed rounded-xl relative overflow-hidden transition-all duration-200 ${examPreview ? 'border-gray-300' : 'border-gray-300 hover:border-green-400 cursor-pointer bg-gray-50'}`}
             >
               {examPreview ? (
                 <div className="relative aspect-auto max-h-[400px]">
@@ -431,7 +492,7 @@ export default function Admin() {
                 value={examNote}
                 onChange={(e) => setExamNote(e.target.value)}
                 placeholder="例如：第一單元小考、這題必考..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-colors resize-none h-24"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-colors resize-none h-24"
                 disabled={isUploadingExam}
               />
             </div>
@@ -439,7 +500,7 @@ export default function Admin() {
             <button
               onClick={handleExamUpload}
               disabled={!examFile || isUploadingExam}
-              className={`w-full py-3 px-4 rounded-xl font-bold flex items-center justify-center space-x-2 transition-all duration-200 ${!examFile ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-white shadow-md'}`}
+              className={`w-full py-3 px-4 rounded-xl font-bold flex items-center justify-center space-x-2 transition-all duration-200 ${!examFile ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white shadow-md'}`}
             >
               {isUploadingExam ? <><Loader2 size={20} className="animate-spin" /><span>上傳中...</span></> : <span>發布題目</span>}
             </button>
@@ -448,11 +509,11 @@ export default function Admin() {
           <div className="mt-12 pt-8 border-t border-gray-100">
             <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
               已發布的考試題目
-              <span className="ml-3 px-2.5 py-1 font-medium bg-amber-100 text-amber-700 text-xs rounded-full">{exams.length}</span>
+              <span className="ml-3 px-2.5 py-1 font-medium bg-green-100 text-green-700 text-xs rounded-full">{exams.length}</span>
             </h3>
             
             {isLoadingExams ? (
-              <div className="flex justify-center py-8 text-gray-400"><Loader2 className="animate-spin text-amber-500" size={24} /></div>
+              <div className="flex justify-center py-8 text-gray-400"><Loader2 className="animate-spin text-green-500" size={24} /></div>
             ) : exams.length === 0 ? (
               <div className="text-center py-8 text-gray-400">尚無發布的考試題目</div>
             ) : (
@@ -460,10 +521,13 @@ export default function Admin() {
                 {exams.map((item) => (
                   <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden shadow-sm flex flex-col relative">
                     <button 
-                      onClick={() => setSelectedImage(item.imageUrl)}
-                      className="block w-full aspect-video bg-gray-50 overflow-hidden relative cursor-pointer border-0 p-0 text-left"
+                      onClick={() => setSelectedImage({ id: item.id, upload: item.imageUrl })}
+                      className="block w-full aspect-video bg-gray-50 overflow-hidden relative cursor-pointer border-0 p-0 text-left group"
                     >
-                      <img src={item.imageUrl} alt="Exam" className="w-full h-full object-cover" />
+                      <img src={item.imageUrl} alt="Exam" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 text-white font-medium drop-shadow-md transition-opacity">點擊放大</span>
+                      </div>
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, collection: 'exams' }); }}
@@ -490,23 +554,99 @@ export default function Admin() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={() => setSelectedImage(null)}
         >
-          <div className="relative max-w-5xl w-full max-h-[90vh] flex items-center justify-center">
+          <div className="relative max-w-7xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedImage(null);
-              }}
-              className="absolute -top-12 right-0 text-white hover:text-gray-300 bg-gray-800 hover:bg-black p-2 rounded-full transition-colors"
+              onClick={() => setSelectedImage(null)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 bg-gray-800 hover:bg-black p-2 rounded-full transition-colors z-[60]"
               title="關閉"
             >
               <X size={24} />
             </button>
-            <img 
-              src={selectedImage} 
-              alt="Enlarged view" 
-              className="max-w-full max-h-[85vh] rounded-lg shadow-xl object-contain bg-black/50"
-              onClick={(e) => e.stopPropagation()}
-            />
+            
+            <div className="flex flex-col items-center justify-center w-full max-h-[75vh]">
+              {selectedImage.exam ? (
+                <div className="flex flex-col md:flex-row w-full gap-4 items-center justify-center h-full">
+                  <div className="flex-1 flex flex-col items-center h-full w-full bg-black/40 rounded-xl p-4">
+                    <h3 className="text-white mb-2 font-bold flex items-center gap-2">
+                      <BookOpen size={18} className="text-green-400" />
+                      原題目
+                    </h3>
+                    <img 
+                      src={selectedImage.exam} 
+                      alt="Exam view" 
+                      className="max-w-full max-h-full object-contain rounded-lg shadow-xl"
+                    />
+                  </div>
+                  <div className="flex-1 flex flex-col items-center h-full w-full bg-black/40 rounded-xl p-4">
+                    <h3 className="text-white mb-2 font-bold flex items-center gap-2">
+                      <ImageIcon size={18} className="text-blue-400" />
+                      訪客回傳
+                    </h3>
+                    <img 
+                      src={selectedImage.upload} 
+                      alt="Uploaded view" 
+                      className="max-w-full max-h-full object-contain rounded-lg shadow-xl"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <img 
+                  src={selectedImage.upload} 
+                  alt="Enlarged view" 
+                  className="max-w-full max-h-full rounded-lg shadow-xl object-contain bg-black/50"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+            </div>
+            
+            {/* 評分區塊 */}
+            {activeTab === 'uploads' && (
+              <div className="mt-6 bg-white w-full max-w-3xl rounded-2xl p-6 shadow-2xl flex flex-col sm:flex-row items-center gap-6 justify-between animate-in slide-in-from-bottom-8">
+                <div className="flex items-center gap-3">
+                  <div className="bg-yellow-50 text-yellow-500 p-3 rounded-full">
+                    <Trophy size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">評分區 (總分 20 分)</h3>
+                    <p className="text-gray-500 text-sm">請拉動滑桿或輸入特定分數來評分</p>
+                  </div>
+                </div>
+                
+                <div className="flex-1 flex items-center w-full gap-4 max-w-md">
+                  <input 
+                    type="range" 
+                    min="0" max="20" step="1"
+                    value={scoreInput === '' ? 0 : scoreInput}
+                    onChange={(e) => setScoreInput(Number(e.target.value))}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                  />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input 
+                      type="number"
+                      min="0" max="20"
+                      value={scoreInput}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? '' : Number(e.target.value);
+                        if (val === '' || (val >= 0 && val <= 20)) {
+                          setScoreInput(val);
+                        }
+                      }}
+                      className="w-16 px-2 py-2 text-center text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 outline-none"
+                    />
+                    <span className="text-gray-500 font-medium">分</span>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleSaveScore}
+                  disabled={isSavingScore || scoreInput === ''}
+                  className="shrink-0 flex items-center gap-2 px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-md disabled:bg-gray-200 disabled:text-gray-400 transition-colors"
+                >
+                  {isSavingScore ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                  <span>儲存分數</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

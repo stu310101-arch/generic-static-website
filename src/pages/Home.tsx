@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { UploadCloud, ShieldCheck, BookOpen } from 'lucide-react';
+import { UploadCloud, ShieldCheck, BookOpen, Trophy } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -11,12 +11,12 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
         <Link 
           to="/exams"
-          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-amber-100 rounded-2xl hover:border-amber-400 hover:shadow-lg transition-all duration-200"
+          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-green-100 rounded-2xl hover:border-green-400 hover:shadow-lg transition-all duration-200"
         >
-          <div className="bg-amber-50 text-amber-500 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+          <div className="bg-green-50 text-green-500 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
             <BookOpen size={32} />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">考試題目</h2>
@@ -43,6 +43,17 @@ export default function Home() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">管理員登入</h2>
           <p className="text-center text-gray-500 text-sm">登入檢視所有訪客上傳的照片</p>
+        </Link>
+
+        <Link 
+          to="/scores"
+          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-yellow-100 rounded-2xl hover:border-yellow-400 hover:shadow-lg transition-all duration-200"
+        >
+          <div className="bg-yellow-50 text-yellow-500 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+            <Trophy size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">成績展示區</h2>
+          <p className="text-center text-gray-500 text-sm">查看優良評分紀錄</p>
         </Link>
       </div>
     </div>
