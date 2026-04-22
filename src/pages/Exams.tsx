@@ -63,7 +63,6 @@ export default function Exams() {
         </div>
         <div>
           <h1 className="text-3xl font-bold text-gray-900">考試題目區</h1>
-          <p className="text-gray-500 mt-1">此處的圖片受到防拷貝保護 (禁止右鍵下載即可防君子)</p>
         </div>
       </div>
 

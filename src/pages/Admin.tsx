@@ -8,7 +8,7 @@ import {
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
-import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X, BookOpen, UploadCloud, CheckCircle } from 'lucide-react';
+import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X, BookOpen, UploadCloud, CheckCircle, Trash2 } from 'lucide-react';
 import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 
 interface UploadItem {
@@ -32,12 +32,17 @@ export default function Admin() {
   
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [isLoadingUploads, setIsLoadingUploads] = useState(false);
+  const [exams, setExams] = useState<UploadItem[]>([]);
+  const [isLoadingExams, setIsLoadingExams] = useState(false);
   const [examFile, setExamFile] = useState<File | null>(null);
   const [examPreview, setExamPreview] = useState<string | null>(null);
   const [examNote, setExamNote] = useState('');
   const [isUploadingExam, setIsUploadingExam] = useState(false);
   const [examUploadMsg, setExamUploadMsg] = useState({ type: '', text: '' });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Custom delete confirm state
+  const [itemToDelete, setItemToDelete] = useState<{id: string, collection: string} | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -49,9 +54,13 @@ export default function Admin() {
 
   useEffect(() => {
     if (user) {
-      fetchUploads();
+      if (activeTab === 'uploads') {
+        fetchUploads();
+      } else {
+        fetchExamsList();
+      }
     }
-  }, [user]);
+  }, [user, activeTab]);
 
   const fetchUploads = async () => {
     setIsLoadingUploads(true);
@@ -77,6 +86,52 @@ export default function Admin() {
       setFetchError(error.message || '無法取得資料，請確認您是否有管理員權限，或 Firebase 權限設定是否正確。');
     } finally {
       setIsLoadingUploads(false);
+    }
+  };
+
+  const fetchExamsList = async () => {
+    setIsLoadingExams(true);
+    try {
+      const q = query(collection(db, 'exams'), orderBy('uploadedAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const items: UploadItem[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        items.push({
+          id: doc.id,
+          imageUrl: data.imageUrl,
+          note: data.note,
+          uploadedAt: data.uploadedAt?.toDate() || null
+        });
+      });
+      setExams(items);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingExams(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+    const { id, collection: collectionName } = itemToDelete;
+    
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      if (collectionName === 'uploads') {
+        setUploads(uploads.filter(item => item.id !== id));
+      } else {
+        setExams(exams.filter(item => item.id !== id));
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      if (collectionName === 'uploads') {
+        setFetchError('刪除失敗，請確認您有足夠的權限。');
+      } else {
+        setExamUploadMsg({ type: 'error', text: '刪除失敗，請確認資料庫權限。' });
+      }
+    } finally {
+      setItemToDelete(null);
     }
   };
 
@@ -142,6 +197,7 @@ export default function Admin() {
       setExamPreview(null);
       setExamNote('');
       if (fileInputRef.current) fileInputRef.current.value = '';
+      fetchExamsList(); // 重新整理考試題目列表
     } catch (error: any) {
       console.error(error);
       setExamUploadMsg({ type: 'error', text: '上傳失敗，請確認資料庫權限或圖片大小。' });
@@ -246,7 +302,7 @@ export default function Admin() {
 
       <div className="flex space-x-2 mb-6 border-b border-gray-200 pb-px">
         <button
-          onClick={() => { setActiveTab('uploads'); fetchUploads(); }}
+          onClick={() => setActiveTab('uploads')}
           className={`flex items-center space-x-2 px-6 py-3 font-medium transition-colors border-b-2 ${
             activeTab === 'uploads' 
               ? 'border-purple-600 text-purple-700 bg-purple-50 rounded-t-xl' 
@@ -290,7 +346,7 @@ export default function Admin() {
         ) : (
           <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {uploads.map((item) => (
-              <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow relative">
                 <button 
                   onClick={() => setSelectedImage(item.imageUrl)}
                   className="block w-full aspect-square bg-gray-50 overflow-hidden relative group cursor-pointer border-0 p-0 text-left"
@@ -302,6 +358,13 @@ export default function Admin() {
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, collection: 'uploads' }); }}
+                  className="absolute top-2 right-2 bg-white/90 hover:bg-red-500 text-red-500 hover:text-white p-2 rounded-full shadow-sm transition-colors z-10 backdrop-blur-sm"
+                  title="刪除圖片"
+                >
+                  <Trash2 size={16} />
                 </button>
                 <div className="p-3 bg-white text-xs text-gray-500 border-b border-gray-100 flex justify-between items-center">
                   <span>上傳時間</span>
@@ -381,6 +444,44 @@ export default function Admin() {
               {isUploadingExam ? <><Loader2 size={20} className="animate-spin" /><span>上傳中...</span></> : <span>發布題目</span>}
             </button>
           </div>
+          
+          <div className="mt-12 pt-8 border-t border-gray-100">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              已發布的考試題目
+              <span className="ml-3 px-2.5 py-1 font-medium bg-amber-100 text-amber-700 text-xs rounded-full">{exams.length}</span>
+            </h3>
+            
+            {isLoadingExams ? (
+              <div className="flex justify-center py-8 text-gray-400"><Loader2 className="animate-spin text-amber-500" size={24} /></div>
+            ) : exams.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">尚無發布的考試題目</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {exams.map((item) => (
+                  <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden shadow-sm flex flex-col relative">
+                    <button 
+                      onClick={() => setSelectedImage(item.imageUrl)}
+                      className="block w-full aspect-video bg-gray-50 overflow-hidden relative cursor-pointer border-0 p-0 text-left"
+                    >
+                      <img src={item.imageUrl} alt="Exam" className="w-full h-full object-cover" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, collection: 'exams' }); }}
+                      className="absolute top-2 right-2 bg-white/90 hover:bg-red-500 text-red-500 hover:text-white p-2 rounded-full shadow-sm transition-colors z-10"
+                      title="刪除題目"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <div className="p-3 bg-white text-xs text-gray-500 border-b border-gray-50 flex justify-between">
+                      <span>發布時間</span>
+                      <span>{item.uploadedAt?.toLocaleDateString()}</span>
+                    </div>
+                    {item.note && <div className="p-3 bg-gray-50 text-sm text-gray-700 break-words">{item.note}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -406,6 +507,29 @@ export default function Admin() {
               className="max-w-full max-h-[85vh] rounded-lg shadow-xl object-contain bg-black/50"
               onClick={(e) => e.stopPropagation()}
             />
+          </div>
+        </div>
+      )}
+
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">確定要刪除嗎？</h3>
+            <p className="text-gray-500 mb-6">資料刪除後將無法復原，請確認是否繼續。</p>
+            <div className="flex space-x-3 justify-end">
+              <button 
+                onClick={() => setItemToDelete(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+              >
+                取消
+              </button>
+              <button 
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium"
+              >
+                確定刪除
+              </button>
+            </div>
           </div>
         </div>
       )}
