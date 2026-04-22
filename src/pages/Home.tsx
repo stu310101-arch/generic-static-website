@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { UploadCloud, ShieldCheck } from 'lucide-react';
+import { UploadCloud, ShieldCheck, BookOpen } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -11,10 +11,21 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+        <Link 
+          to="/exams"
+          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-amber-100 rounded-2xl hover:border-amber-400 hover:shadow-lg transition-all duration-200"
+        >
+          <div className="bg-amber-50 text-amber-500 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+            <BookOpen size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">考試題目</h2>
+          <p className="text-center text-gray-500 text-sm">檢視管理員派發的考題</p>
+        </Link>
+
         <Link 
           to="/upload"
-          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-lg transition-all duration-200"
+          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-blue-100 rounded-2xl hover:border-blue-500 hover:shadow-lg transition-all duration-200"
         >
           <div className="bg-blue-50 text-blue-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
             <UploadCloud size={32} />
@@ -25,7 +36,7 @@ export default function Home() {
 
         <Link 
           to="/admin"
-          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-gray-200 rounded-2xl hover:border-purple-500 hover:shadow-lg transition-all duration-200"
+          className="group relative flex flex-col items-center justify-center p-8 bg-white border-2 border-purple-100 rounded-2xl hover:border-purple-500 hover:shadow-lg transition-all duration-200"
         >
           <div className="bg-purple-50 text-purple-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
             <ShieldCheck size={32} />

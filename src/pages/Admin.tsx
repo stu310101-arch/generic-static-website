@@ -8,7 +8,8 @@ import {
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
-import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X } from 'lucide-react';
+import { Lock, LogOut, Loader2, Image as ImageIcon, ArrowLeft, X, BookOpen, UploadCloud, CheckCircle } from 'lucide-react';
+import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 
 interface UploadItem {
   id: string;
@@ -21,6 +22,8 @@ export default function Admin() {
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'uploads' | 'exams'>('uploads');
+  const [fetchError, setFetchError] = useState('');
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +32,12 @@ export default function Admin() {
   
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [isLoadingUploads, setIsLoadingUploads] = useState(false);
-  const [fetchError, setFetchError] = useState('');
+  const [examFile, setExamFile] = useState<File | null>(null);
+  const [examPreview, setExamPreview] = useState<string | null>(null);
+  const [examNote, setExamNote] = useState('');
+  const [isUploadingExam, setIsUploadingExam] = useState(false);
+  const [examUploadMsg, setExamUploadMsg] = useState({ type: '', text: '' });
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -82,6 +90,63 @@ export default function Admin() {
       setLoginError('密碼錯誤或帳號不存在。');
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_WIDTH = 1200; // 考題可能需要高一點的解析度
+          const MAX_HEIGHT = 1200;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+          } else {
+            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = (e) => reject(e);
+      };
+      reader.onerror = (e) => reject(e);
+    });
+  };
+
+  const handleExamUpload = async () => {
+    if (!examFile) return;
+    setIsUploadingExam(true);
+    setExamUploadMsg({ type: '', text: '' });
+
+    try {
+      const base64String = await compressImage(examFile);
+      await addDoc(collection(db, 'exams'), {
+        imageUrl: base64String,
+        note: examNote.trim() || null,
+        uploadedAt: serverTimestamp()
+      });
+      setExamUploadMsg({ type: 'success', text: '考試題目上傳成功！已同步至首頁。' });
+      setExamFile(null);
+      setExamPreview(null);
+      setExamNote('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (error: any) {
+      console.error(error);
+      setExamUploadMsg({ type: 'error', text: '上傳失敗，請確認資料庫權限或圖片大小。' });
+    } finally {
+      setIsUploadingExam(false);
     }
   };
 
@@ -162,7 +227,7 @@ export default function Admin() {
           返回首頁
         </Link>
       </div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
             <Lock className="text-purple-600" />
@@ -179,8 +244,34 @@ export default function Admin() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[400px]">
-        {fetchError ? (
+      <div className="flex space-x-2 mb-6 border-b border-gray-200 pb-px">
+        <button
+          onClick={() => { setActiveTab('uploads'); fetchUploads(); }}
+          className={`flex items-center space-x-2 px-6 py-3 font-medium transition-colors border-b-2 ${
+            activeTab === 'uploads' 
+              ? 'border-purple-600 text-purple-700 bg-purple-50 rounded-t-xl' 
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-t-xl'
+          }`}
+        >
+          <ImageIcon size={18} />
+          <span>訪客上傳照片</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('exams')}
+          className={`flex items-center space-x-2 px-6 py-3 font-medium transition-colors border-b-2 ${
+            activeTab === 'exams' 
+              ? 'border-amber-500 text-amber-700 bg-amber-50 rounded-t-xl' 
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-t-xl'
+          }`}
+        >
+          <BookOpen size={18} />
+          <span>發布考試題目</span>
+        </button>
+      </div>
+
+      {activeTab === 'uploads' ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[400px]">
+          {fetchError ? (
           <div className="p-8">
             <div className="bg-red-50 text-red-700 p-4 rounded-xl">
               {fetchError}
@@ -225,7 +316,73 @@ export default function Admin() {
             ))}
           </div>
         )}
-      </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden p-6 sm:p-10 max-w-2xl mx-auto">
+          <div className="mb-6 flex items-center space-x-3">
+            <BookOpen className="text-amber-500" size={28} />
+            <h2 className="text-2xl font-bold text-gray-900">上傳考試題目</h2>
+          </div>
+          <p className="text-gray-500 mb-8">在此上傳的圖片會顯示在首頁的「考試題目區」，供一般訪客檢視，且具有基本的防下載保護措施。</p>
+          
+          <div className="space-y-6">
+            {examUploadMsg.text && (
+              <div className={`p-4 rounded-lg text-sm font-medium flex items-center space-x-2 ${examUploadMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {examUploadMsg.type === 'success' ? <CheckCircle size={20} /> : null}
+                <span>{examUploadMsg.text}</span>
+              </div>
+            )}
+
+            <div 
+              onClick={() => !examPreview && fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl relative overflow-hidden transition-all duration-200 ${examPreview ? 'border-gray-300' : 'border-gray-300 hover:border-amber-400 cursor-pointer bg-gray-50'}`}
+            >
+              {examPreview ? (
+                <div className="relative aspect-auto max-h-[400px]">
+                  <img src={examPreview} alt="Preview" className="w-full h-full object-contain bg-gray-900/5" />
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setExamPreview(null); setExamFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="absolute top-2 right-2 bg-gray-900/70 hover:bg-gray-900 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm transition-colors"
+                  >
+                    選擇其他圖片
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 px-4">
+                  <UploadCloud size={48} className="text-gray-400 mb-4" />
+                  <p className="text-gray-600 font-medium mb-1">點擊以選擇題目圖片</p>
+                </div>
+              )}
+              <input 
+                type="file" accept="image/*" className="hidden" ref={fileInputRef}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) { setExamFile(file); setExamPreview(URL.createObjectURL(file)); setExamUploadMsg({ type: '', text: '' }); }
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">題目備註或說明 (選填)</label>
+              <textarea
+                value={examNote}
+                onChange={(e) => setExamNote(e.target.value)}
+                placeholder="例如：第一單元小考、這題必考..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-colors resize-none h-24"
+                disabled={isUploadingExam}
+              />
+            </div>
+
+            <button
+              onClick={handleExamUpload}
+              disabled={!examFile || isUploadingExam}
+              className={`w-full py-3 px-4 rounded-xl font-bold flex items-center justify-center space-x-2 transition-all duration-200 ${!examFile ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-white shadow-md'}`}
+            >
+              {isUploadingExam ? <><Loader2 size={20} className="animate-spin" /><span>上傳中...</span></> : <span>發布題目</span>}
+            </button>
+          </div>
+        </div>
+      )}
 
       {selectedImage && (
         <div 

@@ -2,6 +2,7 @@ import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Home from './pages/Home';
 import Upload from './pages/Upload';
 import Admin from './pages/Admin';
+import Exams from './pages/Exams';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/exams" element={<Exams />} />
           </Routes>
         </main>
       </div>
